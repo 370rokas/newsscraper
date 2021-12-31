@@ -7,9 +7,7 @@ import feedparser
 import requests
 from bs4 import BeautifulSoup
 import html
-import json
 
-enable_logging = True
 headers = {
     'User-Agent': 'Mozilla/5.0 (Linux; Android 7.0; SM-G930V Build/NRD90M) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/59.0.3071.125 Mobile Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
@@ -29,7 +27,12 @@ class Result:
         self.content = content
 
     def json(self):
-        return {self.context, self.title, self.summary, self.content}
+        return {
+            "context": self.context,
+            "title": self.title,
+            "summary": self.summary,
+            "content": self.content
+        }
 
     def __hash__(self):
         return hash(self.context + self.title + self.summary + self.content)
@@ -43,8 +46,8 @@ def fetch_abc():
 
     # ABC Feeds
     feeds = [
-        ["US", "http://feeds.abcnews.com/abcnews/topstories"],
         ["GLOBAL", "http://feeds.abcnews.com/abcnews/internationalheadlines"],
+        ["US", "http://feeds.abcnews.com/abcnews/topstories"],
         ["US", "http://feeds.abcnews.com/abcnews/entertainmentheadlines"],
         ["US", "http://feeds.abcnews.com/abcnews/technologyheadlines"],
         ["US", "http://feeds.abcnews.com/abcnews/travelheadlines"],
@@ -74,12 +77,6 @@ def fetch_abc():
 def fetch_yahoo():
     results = set()
 
-    # Load Yahoo cookies from cookies/yahoo.json
-    with open('./cookies/yahoo.json', 'r') as jsonfile:
-        data = jsonfile.read()
-
-    cookies = json.loads(data)
-
     # Yahoo Feeds
     feeds = [
         ["US", "https://www.yahoo.com/news/rss/us"],
@@ -91,7 +88,7 @@ def fetch_yahoo():
     for url in feeds:
         feed = feedparser.parse(url[1])
         for post in feed.entries:
-            r = requests.get(post["link"], headers=headers, cookies=cookies)
+            r = requests.get(post["link"])
 
             soup = BeautifulSoup(r.content, 'html.parser')
             article_content_element = soup.select_one('.caas-body')
@@ -109,6 +106,62 @@ def fetch_yahoo():
     return results
 
 
+def fetch_cnn():
+    results = set()
+
+    # CNN Feeds
+    feeds = [
+        ["GLOBAL", "http://rss.cnn.com/rss/edition_world.rss"],
+        ["US", "http://rss.cnn.com/rss/edition_us.rss"],
+        ["EU", "http://rss.cnn.com/rss/edition_europe.rss"],
+    ]
+
+    for url in feeds:
+        feed = feedparser.parse(url[1])
+        for post in feed.entries:
+            r = requests.get(post["link"])
+
+            soup = BeautifulSoup(r.content, 'html.parser')
+            article_content_element = soup.find("section", {"id": "body-text"})
+
+            try:
+                results.add(Result(url[0], post["title"], "", html.unescape(article_content_element.get_text())))
+            except:
+                continue
+
+    return results
+
+
+def fetch_fox_news():
+    results = set()
+
+    # Fox News feeds
+    feeds = [
+        ["US", "http://feeds.foxnews.com/foxnews/national"],
+        ["US", "http://feeds.foxnews.com/foxnews/politics"],
+        ["GLOBAL", "http://feeds.foxnews.com/foxnews/world"],
+    ]
+
+    for url in feeds:
+        feed = feedparser.parse(url[1])
+        for post in feed.entries:
+            r = requests.get(post["link"])
+
+            soup = BeautifulSoup(r.content, 'html.parser')
+            article_content_element = soup.select_one('.article-body')
+
+            content = ""
+
+            for p_element in article_content_element.findChildren("p", recursive=False):
+                # Filter out links to other articles, AD's to install the Fox News App
+                if not (p_element.findChildren("a", {}) and p_element.findChildren("strong", {})):
+                    content = content + html.unescape(p_element.get_text()) + "\n"
+
+            results.add(Result(url[0], post["title"], "", content))
+
+    return results
+
+
 def fetch_data():
     results = set()
 
@@ -118,8 +171,10 @@ def fetch_data():
     # Fetch Yahoo results
     results.update(fetch_yahoo())
 
+    # Fetch CNN results
+    results.update(fetch_cnn())
+
+    # Fetch Fox News results
+    results.update(fetch_fox_news())
+
     return results
-
-
-for i in fetch_abc():
-    print(i.json())
