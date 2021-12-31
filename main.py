@@ -64,7 +64,7 @@ def fetch_abc():
                 for p_element in article_content_element.findChildren("p", recursive=False):
                     content = content + html.unescape(p_element.get_text()) + "\n"
 
-                results.add(Result(url[1], post["title"], post["summary"], content))
+                results.add(Result(url[0], post["title"], post["summary"], content))
             except:
                 continue
 
