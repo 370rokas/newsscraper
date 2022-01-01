@@ -1,6 +1,16 @@
 """
+   ______________             __
+  |__  /__  / __ \_________  / /______ ______
+   /_ <  / / / / / ___/ __ \/ //_/ __ `/ ___/
+ ___/ / / / /_/ / /  / /_/ / ,< / /_/ (__  )
+/____/ /_/\____/_/   \____/_/|_|\__,_/____/
+
 NewsScraper
-Author: 370rokas <https://github.com/370rokas>
+
+A simple Python 3 module to get crypto or news articles and their content from various RSS feeds.
+
+Author: 370rokas <https://github.com/370rokas/newsscraper>
+Created: 1st January, 2022
 """
 
 import feedparser
@@ -150,14 +160,86 @@ def fetch_fox_news():
             soup = BeautifulSoup(r.content, 'html.parser')
             article_content_element = soup.select_one('.article-body')
 
-            content = ""
+            try:
+                content = ""
 
-            for p_element in article_content_element.findChildren("p", recursive=False):
-                # Filter out links to other articles, AD's to install the Fox News App
-                if not (p_element.findChildren("a", {}) and p_element.findChildren("strong", {})):
+                for p_element in article_content_element.findChildren("p", recursive=False):
+                    # Filter out links to other articles, AD's to install the Fox News App
+                    if not (p_element.findChildren("a", {}) and p_element.findChildren("strong", {})):
+                        content = content + html.unescape(p_element.get_text()) + "\n"
+
+                results.add(Result(url[0], post["title"], "", content))
+            except:
+                continue
+
+    return results
+
+
+def fetch_coinjournal():
+    results = set()
+
+    # CoinJournal feeds
+    feeds = [
+        ["CRYPTO", "https://coinjournal.net/news/feed/"],
+        ["BLOCKCHAIN", "https://coinjournal.net/news/tag/blockchain/feed/"],
+        ["BTC", "https://coinjournal.net/news/tag/bitcoin/feed/"],
+        ["ETH", "https://coinjournal.net/news/tag/ethereum/feed/"],
+        ["LTC", "https://coinjournal.net/news/tag/litecoin/feed/"],
+    ]
+
+    for url in feeds:
+        feed = feedparser.parse(url[1])
+        for post in feed.entries:
+            r = requests.get(post["link"], headers=headers)
+
+            soup = BeautifulSoup(r.content, 'html.parser')
+            article_content_element = soup.find("article", {"class": "relative"})
+            article_content_element = article_content_element.find("div", {"class":"flow-root mb-4 prose-sm prose md:prose max-w-none"})
+
+            try:
+                content = ""
+
+                for p_element in article_content_element.findChildren("p", recursive=False):
                     content = content + html.unescape(p_element.get_text()) + "\n"
 
-            results.add(Result(url[0], post["title"], "", content))
+                results.add(Result(url[0], post["title"], "", content))
+            except:
+                continue
+
+    return results
+
+
+def fetch_cryptocurrencynews():
+    results = set()
+
+    # Crypto Currency News feeds
+    feeds = [
+        ["CRYPTO", "https://cryptocurrencynews.com/daily-news/crypto-news/feed/"],
+    ]
+
+    for url in feeds:
+        feed = feedparser.parse(url[1])
+        for post in feed.entries:
+            r = requests.get(post["link"], headers=headers)
+
+            soup = BeautifulSoup(r.content, 'html.parser')
+            article_content_element = soup.find("div", {"class": "entry-content clearfix custom-blogpost"})
+
+            try:
+                # Go through nested <div>'s to the content <div>
+
+                for x in range(4):
+                    article_content_element = article_content_element.find("div", {
+                        "class": "Ov(h) Trs($transition-readmore) Mah(999999px)"})
+
+                content = ""
+
+                for p_element in article_content_element.findChildren("p", recursive=False):
+                    content = content + html.unescape(p_element.get_text()) + "\n"
+
+                results.add(Result(url[0], post["title"], "", content))
+            except:
+                continue
 
     return results
 
@@ -176,5 +258,29 @@ def fetch_news_data():
 
     # Fetch Fox News results
     results.update(fetch_fox_news())
+
+    return results
+
+
+def fetch_crypto_data():
+    results = set()
+
+    # Fetch CoinJournal results
+    results.update(fetch_coinjournal())
+
+    # Fetch Crypto Currency News results
+    results.update(fetch_cryptocurrencynews())
+
+    return results
+
+
+def fetch_all():
+    results = set()
+
+    # Fetch News data
+    results.update(fetch_news_data())
+
+    # Fetch Crypto News data
+    results.update(fetch_crypto_data())
 
     return results
