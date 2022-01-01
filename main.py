@@ -162,7 +162,7 @@ def fetch_fox_news():
     return results
 
 
-def fetch_data():
+def fetch_news_data():
     results = set()
 
     # Fetch ABC results
